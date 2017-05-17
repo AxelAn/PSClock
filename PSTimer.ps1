@@ -10,18 +10,23 @@
 #					07.05.2017	AAn		0.2.2.0		Calculate-FontFromText ==> Font.Dispose()
 #					11.05.2017	AAn		0.2.3.0		TimerUp,TimerDown shows EndDate, if Timer ends on future days
 #					17.05.2017	AAn		0.2.4.0		RestartFromSuspend : Recalc-Timer only when not AlarmReached
+#					17.05.2017	AAn		0.2.5.0		Added Mode 'StopWatch"
+#													Change behavior of AutoStart :
+#														- On CountUp, CountDown and Alarm	: Default TRUE
+#														- On StopWatch						: Default FALSE
+#														otherwise Value of Parameter 'AutoStart'
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 #Requires –Version 3
 [CmdletBinding(DefaultParameterSetName='ALL')]
 Param   (
-			[Parameter(Mandatory=$True,Position=0)][ValidateSet("CountUp","CountDown","Alarm")]
+			[Parameter(Mandatory=$True,Position=0)][ValidateSet("CountUp","CountDown","Alarm","StopWatch")]
 			[string]$TimerMode,
-			[Parameter(Mandatory=$True,Position=1)]
-			[string]$AlarmTime,
+			[Parameter(Position=1)]
+			[string]$AlarmTime = "0.00:00:01",
 			[string]$Message = "",
-			[switch]$AutoStart = $True
+			[switch]$AutoStart
 		)
 Set-StrictMode -Version Latest	
 #
@@ -40,7 +45,7 @@ $script:ScriptName		= "PSTimer"
 $script:ScriptDesc		= "Powershell Timer with Timer/CountDown/Alarm"
 $script:ScriptDate		= "17. Mai 2017"
 $script:ScriptAuthor	= "Axel Anderson"					
-$script:ScriptVersion	= "0.2.4.0"
+$script:ScriptVersion	= "0.2.5.0"
 $script:ConfigVersion	= "1"
 #
 #Script Information
@@ -316,6 +321,23 @@ Param	(
 			if ($spanOld.Days -ne $span.days) {
 				Resize-Controls
 			}
+		} elseif ($script:CurrentTimeMode -eq "StopWatch") {
+
+			[TimeSpan]$spanOld = [Timespan]::FromSeconds($script:CurrentAlarmSeconds)
+			[TimeSpan]$span = [Timespan]::FromSeconds(++$script:CurrentAlarmSeconds)
+			$script:lbTimeDisplay.Text = Get-TimeDisplayText -Seconds $script:CurrentAlarmSeconds
+
+			if ($script:CurrentAlarmSeconds -ge $script:AlarmSeconds) {
+				$script:AlarmReached = $True
+				Start-Sound -Looping
+				$buttonSet.Enabled = $False
+				$buttonStart.Enabled = $False
+				$buttonStop.Enabled = $True		
+				Set-WindowTopMost
+			}
+			if ($spanOld.Days -ne $span.days) {
+				Resize-Controls
+			}		
 		}
 	}
 	#
@@ -538,7 +560,11 @@ Param	(
 	if ($script:futureDays -gt 0) {
 		$TimeStr = ((get-date)+$span).ToString("HH.mm.ss") + " ("+$script:Enddate.ToShortDateString()+")"
 	} else {
-		$TimeStr = ((get-date)+$span).ToString("HH.mm.ss")
+		if ($script:CurrentTimeMode -eq "StopWatch") {
+			$TimeStr = ""
+		} else {
+			$TimeStr = ((get-date)+$span).ToString("HH.mm.ss")
+		}
 	}
 	Write-Output $Timestr	
 }
@@ -688,7 +714,7 @@ Param	(
 		$_.StartPosition = "CenterScreen"
 		$_.ClientSize = New-Object System.Drawing.Size($script:MainFormWidth, $script:MainFormHeight)
 
-		$_.Text = "$($script:ScriptName) - "+$script:CurrentTimeMode+" - "
+		$_.Text = "$($script:ScriptName) - "+$script:CurrentTimeMode
 		
 		$_.Font = $Script:FontBase
 		$_.Opacity = 1.0
@@ -754,11 +780,16 @@ Param	(
 			$script:CurrentAlarmSeconds = 0
 			$script:lbTimeDisplay.Text = "00:00:00"
 			$buttonStart.Enabled = $True
+			
 		} elseif ($script:CurrentTimeMode -eq "CountDown") {
 			$script:CurrentAlarmSeconds = $script:AlarmSeconds	
 			$script:lbTimeDisplay.Text = Get-TimeDisplayText -Seconds $script:CurrentAlarmSeconds
-		
 			$buttonStart.Enabled = $True
+			
+		} elseif ($script:CurrentTimeMode -eq "StopWatch") {
+			$script:CurrentAlarmSeconds = 0
+			$script:lbTimeDisplay.Text = "00:00:00"
+			$buttonStart.Enabled = $True		
 		}
 	})
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -772,14 +803,26 @@ Param	(
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	if ($script:CurrentTimeMode -eq "CountUp") {
 		$script:lbTimeDisplay.Text = "00:00:00"
+		
+		$script:formMainWindow.Text += " - $(Get-FinishedTimeText)"
+		
 	} elseif ($script:CurrentTimeMode -eq "CountDown") {
 		$script:lbTimeDisplay.Text = Get-TimeDisplayText -Seconds $script:CurrentAlarmSeconds
+		
+		$script:formMainWindow.Text += " - $(Get-FinishedTimeText)"
+		
 	} elseif ($script:CurrentTimeMode -eq "Alarm") {
 		$script:lbTimeDisplay.Text = Get-TimeDisplayText -Seconds $script:CurrentAlarmSeconds
 		$script:lbNoticeDisplay.Text = " At $(Get-FinishedTimeText)"	
+		
+		$script:formMainWindow.Text += " - $(Get-FinishedTimeText)"
+		
+	} elseif ($script:CurrentTimeMode -eq "StopWatch") {
+		$script:lbTimeDisplay.Text = Get-TimeDisplayText -Seconds $script:CurrentAlarmSeconds
+		$script:lbNoticeDisplay.Text = " . . . "	
+		
 	}
-
-	$script:formMainWindow.Text += " At $(Get-FinishedTimeText)"
+	
 		
 	if ($script:CurrentAutostart) {
 		Start-MainClockTick
@@ -819,7 +862,7 @@ Param	(
 # #############################################################################
 # ##### MAIN
 # #############################################################################
-				
+
 if ($script:CurrentTimeMode -eq "CountUp") {
 	try {
 		$span = [Timespan]::Parse($AlarmTime)
@@ -835,6 +878,12 @@ if ($script:CurrentTimeMode -eq "CountUp") {
 	}
 	$script:CurrentAlarmSeconds = 0
 	
+	if ($PSBoundParameters.ContainsKey("AutoStart")) {
+		$script:CurrentAutostart 	= $AutoStart
+	} else {
+		$script:CurrentAutostart 	= $True
+	}
+	
 } elseif ($script:CurrentTimeMode -eq "CountDown") {
 	try {
 		$span = [Timespan]::Parse($AlarmTime)
@@ -849,6 +898,12 @@ if ($script:CurrentTimeMode -eq "CountUp") {
 		return 1
 	}
 	$script:CurrentAlarmSeconds = $script:AlarmSeconds
+
+	if ($PSBoundParameters.ContainsKey("AutoStart")) {
+		$script:CurrentAutostart 	= $AutoStart
+	} else {
+		$script:CurrentAutostart 	= $True
+	}
 	
 } elseif ($script:CurrentTimeMode -eq "Alarm") {
 	try {
@@ -869,6 +924,30 @@ if ($script:CurrentTimeMode -eq "CountUp") {
 	}
 	$script:AlarmSeconds = $span.TotalSeconds
 	$script:CurrentAlarmSeconds = $script:AlarmSeconds
+
+	if ($PSBoundParameters.ContainsKey("AutoStart")) {
+
+		$script:CurrentAutostart 	= $AutoStart
+	} else {
+		$script:CurrentAutostart 	= $True
+	}
+	
+} elseif ($script:CurrentTimeMode -eq "StopWatch") {
+
+	$totalSeconds = [int64](([timespan]::MaxValue).TotalSeconds)
+
+	$script:AlarmSeconds = $TotalSeconds - 1
+	$script:CurrentAlarmSeconds = 0
+	
+	$script:Startdate = (Get-date).date
+	$script:Enddate   = $script:StartDate
+	$script:futureDays = 0
+	
+	if ($PSBoundParameters.ContainsKey("AutoStart")) {
+		$script:CurrentAutostart 	= $AutoStart
+	} else {
+		$script:CurrentAutostart 	= $False
+	}
 	
 } else {
 	return 100
@@ -900,6 +979,7 @@ New-MainWindow
 
 Stop-Sound
 Stop-MainClockTick
+$script:tmrTickMain = $null
 
 Unregister-Event -SourceIdentifier "PowerSuspend"
 Unregister-Event -SourceIdentifier "PowerResume"

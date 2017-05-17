@@ -8,6 +8,7 @@
 #					30.4.2017	AAn		0.2.0.0		Alarm Dialog
 #					07.05.2017	AAn		0.2.1.0		Calculate-FontFromText ==> Font.Dispose()
 #					11.05.2017	AAn		0.2.2.0		Opacity-Settings in Config
+#					17.05.2017	AAn		0.2.3.0		Add StopWatch in ContectMenu
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -25,9 +26,9 @@ Set-StrictMode -Version Latest
 #
 $script:ScriptName		= "PSClock"
 $script:ScriptDesc		= "Powershell Clock"
-$script:ScriptDate		= "11. Mai 2017"
+$script:ScriptDate		= "17. Mai 2017"
 $script:ScriptAuthor	= "Axel Anderson"					
-$script:ScriptVersion	= "0.2.2.0"
+$script:ScriptVersion	= "0.2.3.0"
 $script:ConfigVersion	= "1"
 #
 #Script Information
@@ -118,7 +119,10 @@ $script:contextMenu = New-Object System.Windows.Forms.ContextMenu
 	$contextMenu.MenuItems.Add($script:menuItem_CountDown) | out-null
 	$script:menuItem_Alarm 				= New-Object System.Windows.Forms.MenuItem "Alarm"
 	$contextMenu.MenuItems.Add($script:menuItem_Alarm) | out-null
-	
+
+	$script:menuItem_StopWatch 				= New-Object System.Windows.Forms.MenuItem "StopWatch"
+	$contextMenu.MenuItems.Add($script:menuItem_StopWatch) | out-null
+
 	$contextMenu.MenuItems.Add("-") | out-null
 	$script:menuItem_Exit = $contextMenu.MenuItems.Add("Exit")
 
@@ -644,6 +648,16 @@ Param	(
 #					
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
+Function Stop-MainClockTick {
+[CmdletBinding()]
+Param	(
+		)
+		
+	$script:tmrTickMain.Stop()
+	$script:tmrTickMain.IsEnabled = $false
+	$script:tmrTickMain.Remove_Tick($SB_MainClockTimerTick)
+
+}
 function Calculate-FontFromText {
 [CmdletBinding()]
 	Param(  [Parameter(Mandatory=$true)][System.Drawing.Font]$StartFont,
@@ -944,6 +958,11 @@ Param	(
 		if ($Alarm -ne $Null) {
 			Start-Alarm "Alarm" $Alarm
 		}
+	})
+	$script:menuItem_StopWatch.add_click({
+	
+		Start-Alarm "StopWatch" 
+
 	})
 #endregion CONTEXT MENU EVENTS
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1331,6 +1350,9 @@ Load-Settings
 Load-AllScriptSettingValues
 
 New-MainWindow
+
+Stop-MainClockTick
+$script:tmrTickMain = $null
 
 # #############################################################################
 # ##### END MAIN
