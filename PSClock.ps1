@@ -37,11 +37,13 @@ $script:WorkingDirectory = Split-Path $script:WorkingFileName -Parent
 
 [void][System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
 [void][System.Reflection.Assembly]::LoadWithPartialName("System.Drawing")
-[System.Windows.Forms.Application]::EnableVisualStyles()
 	
 Add-Type –assemblyName WindowsBase -IgnoreWarnings	
 
 #region WINFORMS CONTROLS	
+
+[System.Windows.Forms.Application]::EnableVisualStyles()
+
 $script:formMainWindow			= New-Object System.Windows.Forms.Form	
 	$script:tablePanelMain 		= New-Object System.Windows.Forms.TableLayoutPanel	
 		$script:lbTimeDisplay 	= New-Object System.Windows.Forms.Label
@@ -578,6 +580,28 @@ Param	(
 #endregion CONFIGURATION
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<#
+public static void SetDoubleBuffering(System.Windows.Forms.Control control, bool value)
+{
+    System.Reflection.PropertyInfo controlProperty = typeof(System.Windows.Forms.Control)
+        .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+    controlProperty.SetValue(control, value, null);
+}
+
+$L.GetType().getProperty("DoubleBuffered",[System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Instance)
+$prop.SetValue($L,$True,$Null)
+#>
+Function Set-WincontrolDoubleBuffering {
+[CmdletBinding()]
+Param	(
+			$Control,
+			[switch]$value = $True
+		)
+		
+	$prop = $Control.GetType().getProperty("DoubleBuffered",[System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Instance)
+	$prop.SetValue($Control,$True,$Null)
+	
+}
 
 Function Update-Clock {
 [CmdletBinding()]
@@ -1014,8 +1038,13 @@ Param	(
 	$script:lbdateDisplay.Text = [System.Datetime]::Now.ToLongDateString()
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	
-	Start-MainClockTick
-			
+	Set-WincontrolDoubleBuffering -Control $script:lbTimeDisplay
+	Set-WincontrolDoubleBuffering -Control $script:lbdateDisplay
+	
+	Start-MainClockTick 
+
+
+	
 	$script:formMainWindow.ShowDialog() | out-null	
 	
 	$Script:NotifyIcon.Visible = $False
