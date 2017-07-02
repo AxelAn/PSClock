@@ -133,6 +133,23 @@ $SB_MainClockTimerTick = {
 #					
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
+#					
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+Function Set-WincontrolDoubleBuffering {
+[CmdletBinding()]
+Param	(
+			$Control,
+			[switch]$value = $True
+		)
+		
+	$prop = $Control.GetType().getProperty("DoubleBuffered",[System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Instance)
+	$prop.SetValue($Control,$True,$Null)
+	
+}
+#					
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
 Function Show-MessageBox {
 	param ($title,$text,$buttons="OK",$icon="None")
 	 
@@ -837,6 +854,8 @@ Param	(
 	} else {
 		$buttonStop.Enabled = $False	
 	}
+	Set-WincontrolDoubleBuffering -Control $script:lbTimeDisplay
+	
 	
 	$script:formMainWindow.ShowDialog() | out-null	
 	
@@ -856,6 +875,24 @@ Param	(
 #					
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
+Function Get-Laptop {
+[CmdletBinding()]
+Param	(
+		)
+	$isLaptop = $false
+	try {
+		if(Get-WmiObject -Class win32_systemenclosure | Where-Object { $_.chassistypes -eq 9 -or $_.chassistypes -eq 10 -or $_.chassistypes -eq 14}) { 
+			$isLaptop = $true
+		}
+	} catch {}
+	try {
+		if(Get-WmiObject -Class win32_battery) { 
+			$isLaptop = $true
+		}
+	} catch {}
+	Write-Output $isLaptop
+}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #region MAIN
@@ -955,24 +992,25 @@ if ($script:CurrentTimeMode -eq "CountUp") {
 
 #region POWER MANAGEMENT
 
-$WMIEventQuery = "Select * From Win32_PowerManagementEvent where EventType=4"
-$JobSuspend = Register-WmiEvent `
-		-Query $WMIEventQuery  `
-		-SourceIdentifier "PowerSuspend" `
-		-Action {
-					$Global:SuspendTime = [datetime]::Now
-					"########## Entering Suspend ($([datetime]::Now)) ##########" | out-host;
-				}
-$WMIEventQuery = "Select * From Win32_PowerManagementEvent where EventType=7"
-$JobResume = Register-WmiEvent `
-		-Query $WMIEventQuery  `
-		-SourceIdentifier "PowerResume" `
-		-Action {
-					$Global:ResumeTime = [datetime]::Now
-					"########## Resume from Suspend ($([datetime]::Now)) ##########" | out-host;
-					$Global:RestartFromSuspend = $True
-				}
-				
+if (Get-Laptop) {
+	$WMIEventQuery = "Select * From Win32_PowerManagementEvent where EventType=4"
+	$JobSuspend = Register-WmiEvent `
+			-Query $WMIEventQuery  `
+			-SourceIdentifier "PowerSuspend" `
+			-Action {
+						$Global:SuspendTime = [datetime]::Now
+						"########## Entering Suspend ($([datetime]::Now)) ##########" | out-host;
+					}
+	$WMIEventQuery = "Select * From Win32_PowerManagementEvent where EventType=7"
+	$JobResume = Register-WmiEvent `
+			-Query $WMIEventQuery  `
+			-SourceIdentifier "PowerResume" `
+			-Action {
+						$Global:ResumeTime = [datetime]::Now
+						"########## Resume from Suspend ($([datetime]::Now)) ##########" | out-host;
+						$Global:RestartFromSuspend = $True
+					}
+}					
 #endregion POWER MANAGEMENT
 
 New-MainWindow
@@ -981,9 +1019,10 @@ Stop-Sound
 Stop-MainClockTick
 $script:tmrTickMain = $null
 
-Unregister-Event -SourceIdentifier "PowerSuspend"
-Unregister-Event -SourceIdentifier "PowerResume"
-
+if (Get-Laptop) {
+	Unregister-Event -SourceIdentifier "PowerSuspend"
+	Unregister-Event -SourceIdentifier "PowerResume"
+}
 
 # #############################################################################
 # ##### END MAIN
