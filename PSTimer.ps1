@@ -15,6 +15,10 @@
 #														- On CountUp, CountDown and Alarm	: Default TRUE
 #														- On StopWatch						: Default FALSE
 #														otherwise Value of Parameter 'AutoStart'
+#								AAn		0.2.5.1		Avoid Flickering on some computer
+#								AAn		0.2.5.2		Resume and Syspend events only on laptop; Test it !!!!
+#					23.07.2017	AAn		0.2.6.0		SoundSeconds, SnoozeSeconds and SoundLoops
+#													Don't want to ring all the weekend ;-)
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -26,7 +30,10 @@ Param   (
 			[Parameter(Position=1)]
 			[string]$AlarmTime = "0.00:00:01",
 			[string]$Message = "",
-			[switch]$AutoStart
+			[switch]$AutoStart,
+			[uint32]$MaxSoundSeconds = 30,
+			[uint32]$MaxSnoozeSeconds = 120,
+			[uint32]$MaxSoundLoops = 20
 		)
 Set-StrictMode -Version Latest	
 #
@@ -43,9 +50,9 @@ Add-Type -AssemblyName System.Speech -IgnoreWarnings
 
 $script:ScriptName		= "PSTimer"
 $script:ScriptDesc		= "Powershell Timer with Timer/CountDown/Alarm"
-$script:ScriptDate		= "17. Mai 2017"
+$script:ScriptDate		= "23. Juli 2017"
 $script:ScriptAuthor	= "Axel Anderson"					
-$script:ScriptVersion	= "0.2.5.0"
+$script:ScriptVersion	= "0.2.6.0"
 $script:ConfigVersion	= "1"
 #
 #Script Information
@@ -63,8 +70,11 @@ $script:CurrentAutostart 	= $AutoStart
 [int64]$script:AlarmSeconds = 0
 [int64]$script:CurrentAlarmSeconds = 0
 $script:AlarmReached = $False
-
 $script:BrokenTimer = $False
+$script:SoundLooping = $False
+$script:SoundSeconds = 0
+$script:SoundSnoozeSeconds = 0
+$script:SoundLoops = 0
 
 $script:futureDays = 0
 #
@@ -284,6 +294,30 @@ Param	(
 				$script:lbTimeDisplay.ForeColor = [System.Drawing.Color]::WhiteSmoke
 			}
 			
+			if ($script:SoundLooping) {
+				$script:SoundSeconds++
+				"SoundSeconds: $($script:SoundSeconds)"|out-host
+				
+				if ($script:SoundSeconds -ge $MaxSoundSeconds) {
+					Stop-Sound
+					$script:SoundSnoozeSeconds = 0
+				}
+			} else {
+				$script:SoundSnoozeSeconds++
+				"SoundSnoozeSeconds: $($script:SoundSnoozeSeconds)"|out-host
+				
+				if ($script:SoundSnoozeSeconds -ge $MaxSnoozeSeconds) {
+					$script:SoundSnoozeSeconds = 0
+					
+					$script:SoundLoops++
+					"SoundLoops: $($script:SoundLoops)"|out-host
+					
+					if ($script:SoundLoops -le $MaxSoundLoops) {
+						Start-Sound -Looping
+					}
+				}
+			}
+			
 		} elseif ($script:CurrentTimeMode -eq "CountUp") {
 
 			[TimeSpan]$spanOld = [Timespan]::FromSeconds($script:CurrentAlarmSeconds)
@@ -424,6 +458,8 @@ Param	(
 		)
 	if ($Looping) {
 		$script:SoundPlayer.PlayLooping()
+		$script:SoundLooping = $True
+		$script:SoundSeconds = 0
 	} else {
 		$script:SoundPlayer.Play()
 	}
@@ -438,6 +474,8 @@ Function Stop-Sound {
 Param	(
 		)
 	$script:SoundPlayer.Stop()
+	$script:SoundLooping = $false
+	$script:SoundSeconds = 0
 }
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -675,6 +713,14 @@ Param	(
 		$_.Name = "lbTimeDisplay"
 		$_.TabStop = $false
 		$_.Text = "00:00:00"
+		
+		# Test avoid flickering
+		# AAn 3.7.2017
+		#
+		$_.Anchor = ([System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right -bor [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left)
+		$_.Dock = [System.Windows.Forms.DockStyle]::None
+
+		Set-WincontrolDoubleBuffering -Control $_
 	}
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	$script:lbNoticeDisplay | % {
@@ -854,8 +900,6 @@ Param	(
 	} else {
 		$buttonStop.Enabled = $False	
 	}
-	Set-WincontrolDoubleBuffering -Control $script:lbTimeDisplay
-	
 	
 	$script:formMainWindow.ShowDialog() | out-null	
 	

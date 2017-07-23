@@ -9,7 +9,7 @@
 #					07.05.2017	AAn		0.2.1.0		Calculate-FontFromText ==> Font.Dispose()
 #					11.05.2017	AAn		0.2.2.0		Opacity-Settings in Config
 #					17.05.2017	AAn		0.2.3.0		Add StopWatch in ContectMenu
-#
+#					23.07.2017	AAn		0.2.4.0		Avoid Flickering on some computer
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 #Requires –Version 3
@@ -28,7 +28,7 @@ $script:ScriptName		= "PSClock"
 $script:ScriptDesc		= "Powershell Clock"
 $script:ScriptDate		= "17. Mai 2017"
 $script:ScriptAuthor	= "Axel Anderson"					
-$script:ScriptVersion	= "0.2.3.0"
+$script:ScriptVersion	= "0.2.4.0"
 $script:ConfigVersion	= "1"
 #
 #Script Information
@@ -579,18 +579,9 @@ Param	(
 
 #endregion CONFIGURATION
 
+#
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-<#
-public static void SetDoubleBuffering(System.Windows.Forms.Control control, bool value)
-{
-    System.Reflection.PropertyInfo controlProperty = typeof(System.Windows.Forms.Control)
-        .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-    controlProperty.SetValue(control, value, null);
-}
-
-$L.GetType().getProperty("DoubleBuffered",[System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Instance)
-$prop.SetValue($L,$True,$Null)
-#>
+#
 Function Set-WincontrolDoubleBuffering {
 [CmdletBinding()]
 Param	(
@@ -602,7 +593,9 @@ Param	(
 	$prop.SetValue($Control,$True,$Null)
 	
 }
-
+#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
 Function Update-Clock {
 [CmdletBinding()]
 Param	(
@@ -682,6 +675,9 @@ Param	(
 	$script:tmrTickMain.Remove_Tick($SB_MainClockTimerTick)
 
 }
+#					
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
 function Calculate-FontFromText {
 [CmdletBinding()]
 	Param(  [Parameter(Mandatory=$true)][System.Drawing.Font]$StartFont,
@@ -757,6 +753,7 @@ Function Resize-Controls {
 [CmdletBinding()]
 Param	(
 		)
+#"Resize-Controls" | out-host
 	$script:FontMainTime = Adjust-ControlFont -Control $script:lbTimeDisplay -ControlFont $script:FontMainTime
 	$script:lbTimeDisplay.Font = $script:FontMainTime
 	# ----------------------------------------------------------------------------------------------------
@@ -785,6 +782,14 @@ Param	(
 		$_.Name = "lbTimeDisplay"
 		$_.TabStop = $false
 		$_.Text = ""
+		
+		# Test avoid flickering
+		# AAn 3.7.2017
+		#
+		$_.Anchor = ([System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right -bor [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left)
+		$_.Dock = [System.Windows.Forms.DockStyle]::None
+
+		Set-WincontrolDoubleBuffering -Control $_
 	}
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	$script:lbdateDisplay | % {
@@ -798,6 +803,8 @@ Param	(
 		$_.Name = "lbdateDisplay"
 		$_.TabStop = $false
 		$_.Text = ""
+
+		Set-WincontrolDoubleBuffering -Control $_
 	}
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
 	$script:tablePanelMain  | % {
@@ -1038,9 +1045,7 @@ Param	(
 	$script:lbdateDisplay.Text = [System.Datetime]::Now.ToLongDateString()
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	
-	Set-WincontrolDoubleBuffering -Control $script:lbTimeDisplay
-	Set-WincontrolDoubleBuffering -Control $script:lbdateDisplay
-	
+
 	Start-MainClockTick 
 
 
