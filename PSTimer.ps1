@@ -296,7 +296,7 @@ Param	(
 			
 			if ($script:SoundLooping) {
 				$script:SoundSeconds++
-				"SoundSeconds: $($script:SoundSeconds)"|out-host
+				#"SoundSeconds: $($script:SoundSeconds)"|out-host
 				
 				if ($script:SoundSeconds -ge $MaxSoundSeconds) {
 					Stop-Sound
@@ -304,13 +304,13 @@ Param	(
 				}
 			} else {
 				$script:SoundSnoozeSeconds++
-				"SoundSnoozeSeconds: $($script:SoundSnoozeSeconds)"|out-host
+				#"SoundSnoozeSeconds: $($script:SoundSnoozeSeconds)"|out-host
 				
 				if ($script:SoundSnoozeSeconds -ge $MaxSnoozeSeconds) {
 					$script:SoundSnoozeSeconds = 0
 					
 					$script:SoundLoops++
-					"SoundLoops: $($script:SoundLoops)"|out-host
+					#"SoundLoops: $($script:SoundLoops)"|out-host
 					
 					if ($script:SoundLoops -le $MaxSoundLoops) {
 						Start-Sound -Looping
